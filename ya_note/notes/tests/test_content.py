@@ -20,7 +20,8 @@ class TestContent(TestDataContent, TestCase):
         ]
 
         for client, expected_in_list in test_cases:
-            with self.subTest(client=client, expected_in_list=expected_in_list):
+            with self.subTest(client=client,
+                              expected_in_list=expected_in_list):
                 url = reverse('notes:list')
                 response = client.get(url)
                 self.assertEqual(response.status_code, HTTPStatus.OK)

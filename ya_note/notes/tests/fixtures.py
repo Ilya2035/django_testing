@@ -10,9 +10,7 @@ User = get_user_model()
 class TestDataContent(TestCase):
     @classmethod
     def setUpTestData(cls):
-        """
-        Создание тестовых данных для проверки видимости заметок.
-        """
+        """Создание тестовых данных для проверки видимости заметок."""
         cls.note_author = User.objects.create(username='note_author')
         cls.other_user = User.objects.create(username='other_user')
         cls.author_client = Client()
@@ -30,9 +28,7 @@ class TestDataContent(TestCase):
 class TestDataLogicForNoteCreation(TestCase):
     @classmethod
     def setUpTestData(cls):
-        """
-        Подготовка данных для тестирования создания заметок.
-        """
+        """Подготовка данных для тестирования создания заметок."""
         cls.user = User.objects.create(username='test_user')
         cls.url = reverse('notes:add')
         cls.user_client = Client()
@@ -48,7 +44,8 @@ class TestDataLogicForNoteEditDelete(TestCase):
     @classmethod
     def setUpTestData(cls):
         """
-        Подготовка данных для тестирования редактирования и удаления заметок.
+        Подготовка данных для тестирования
+        редактирования и удаления заметок.
         """
         cls.note_author = User.objects.create(username='note_author')
         cls.other_user = User.objects.create(username='other_user')
@@ -76,9 +73,7 @@ class TestDataLogicForNoteEditDelete(TestCase):
 class TestDataRoutes(TestCase):
     @classmethod
     def setUpTestData(cls):
-        """
-        Создает тестовых пользователей и заметку для проверки маршрутов.
-        """
+        """Создает тестовых пользователей и заметку для проверки маршрутов."""
         cls.note_author = User.objects.create(username='note_author')
         cls.other_user = User.objects.create(username='other_user')
         cls.author_client = Client()
