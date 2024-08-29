@@ -44,3 +44,4 @@ class TestContent(TestDataContent, TestCase):
                 self.assertIn('form', response.context)
                 form_obj = response.context['form']
                 self.assertIsInstance(form_obj, NoteForm)
+#конец
