@@ -86,4 +86,3 @@ class TestDataRoutes(TestCase):
             slug='sample-slug',
             author=cls.note_author
         )
-#конец

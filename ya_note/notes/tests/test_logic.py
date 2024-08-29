@@ -107,4 +107,3 @@ class TestNoteEditDelete(TestDataLogicForNoteEditDelete, TestCase):
         self.assertEqual(self.note.slug, original_slug)
         self.assertEqual(self.note.title, original_title)
         self.assertEqual(self.note.text, original_text)
-#конец
