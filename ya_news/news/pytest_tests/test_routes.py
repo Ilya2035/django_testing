@@ -1,7 +1,8 @@
 import pytest
 from django.urls import reverse
-from news.models import News, Comment
 from pytest_django.asserts import assertRedirects
+
+from news.models import News, Comment
 
 
 @pytest.mark.django_db
