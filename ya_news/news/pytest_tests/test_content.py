@@ -1,118 +1,76 @@
 import pytest
+
 from django.urls import reverse
 
-from news.models import News, Comment
+from yanews.settings import NEWS_COUNT_ON_HOME_PAGE
+from news.forms import CommentForm
 
 
 @pytest.mark.django_db
-def test_news_count_on_homepage(client):
+def test_news_count_on_home_page(reader_logged_in_client, multiple_news_items):
     """
-    Проверяет, что на главной странице
-    отображается не более 10 новостей.
+    Проверяет, что количество новостей на главной странице не превышает
+    максимальное количество, заданное в настройках приложения.
     """
-    # Создаем 12 новостей
-    for i in range(12):
-        News.objects.create(title=f'News {i}', text='This is a test news.')
-
-    response = client.get(reverse('news:home'))
-    assert response.status_code == 200
-    # Проверяем, что на странице не более 10 новостей
-    assert len(response.context['news_list']) <= 10
+    url = reverse('news:home')
+    response = reader_logged_in_client.get(url)
+    assert 'news_list' in response.context
+    obj_list = response.context['news_list']
+    assert len(obj_list) <= NEWS_COUNT_ON_HOME_PAGE
 
 
 @pytest.mark.django_db
-def test_news_ordering(client):
+def test_news_order_on_home_page(client, multiple_news_items):
     """
-    Проверяет, что новости отсортированы
-    от самой свежей к самой старой.
+    Проверяет, что новости на главной странице отсортированы
+    по дате публикации от самой свежей к самой старой.
     """
-    # Создаем 2 новости с явными датами публикации
-    news1 = News.objects.create(
-        title='Old News',
-        text='This is an old news.',
-        date='2022-01-01'
-    )
-    news2 = News.objects.create(
-        title='New News',
-        text='This is a new news.',
-        date='2022-01-02'
-    )
-
-    response = client.get(reverse('news:home'))
-    assert response.status_code == 200
+    url = reverse('news:home')
+    response = client.get(url)
+    assert 'news_list' in response.context
     news_list = response.context['news_list']
-
-    # Проверяем, что первая новость - это самая новая
-    assert news_list[0] == news2
-    assert news_list[1] == news1
+    dates = [news.date for news in news_list]
+    assert dates == sorted(dates, reverse=True)
 
 
 @pytest.mark.django_db
-def test_comments_ordering_on_news_page(client, django_user_model):
+def test_comments_order_on_news_detail_page(
+        client,
+        multiple_comments,
+        news_item_id
+):
     """
-    Проверяет, что комментарии на странице отдельной новости
-    отсортированы в хронологическом порядке.
+    Проверяет, что комментарии на странице отдельной новости отсортированы
+    в хронологическом порядке.
     """
-    # Создаем новость и два комментария с разными временными метками
-    news = News.objects.create(
-        title='Test News',
-        text='This is a test news.'
-    )
-    user = django_user_model.objects.create_user(
-        username='user',
-        password='password'
-    )
-    Comment.objects.create(
-        news=news, author=user,
-        text='Old Comment',
-        created='2022-01-01'
-    )
-    Comment.objects.create(
-        news=news,
-        author=user,
-        text='New Comment',
-        created='2022-01-02'
-    )
-
-    response = client.get(reverse(
-        'news:detail',
-        args=[news.pk]
-    ))
-    assert response.status_code == 200
-
-    # Используем comment_set для доступа к комментариям
-    comments = news.comment_set.order_by('created')
-    # Проверяем, что комментарии отсортированы по дате создания
-    assert comments[0].text == 'Old Comment'
-    assert comments[1].text == 'New Comment'
+    url = reverse('news:detail', args=news_item_id)
+    response = client.get(url)
+    assert 'news' in response.context
+    news_obj = response.context['news']
+    comments = news_obj.comment_set.all()
+    created_times = [comment.created for comment in comments]
+    assert created_times == sorted(created_times)
 
 
 @pytest.mark.django_db
-def test_comment_form_visibility(client, django_user_model):
+def test_comment_form_for_anonymous_user(client, single_comment):
     """
-    Проверяет, что анонимному пользователю
-    недоступна форма для отправки комментария,
-    а авторизованному пользователю доступна.
+    Проверяет, что форма для отправки комментария недоступна
+    анонимному пользователю на странице отдельной новости.
     """
-    news = News.objects.create(
-        title='Test News',
-        text='This is a test news.'
-    )
-    response = client.get(reverse('news:detail', args=[news.pk]))
-    assert response.status_code == 200
-    # Проверяем, что форма недоступна для анонимного пользователя
+    url = reverse('news:detail', args=[single_comment.news.pk])
+    response = client.get(url)
     assert 'form' not in response.context
 
-    # Создаем и логиним пользователя
-    user = django_user_model.objects.create_user(
-        username='user',
-        password='password'
-    )
-    client.force_login(user)
-    response = client.get(reverse(
-        'news:detail',
-        args=[news.pk]
-    ))
-    assert response.status_code == 200
-    # Проверяем, что форма доступна для авторизованного пользователя
+
+@pytest.mark.django_db
+def test_comment_form_for_reader(reader_logged_in_client, single_comment):
+    """
+    Проверяет, что авторизованному пользователю доступна форма
+    для отправки комментария на странице отдельной новости.
+    """
+    url = reverse('news:detail', args=[single_comment.news.pk])
+    response = reader_logged_in_client.get(url)
     assert 'form' in response.context
+    form_obj = response.context['form']
+    assert isinstance(form_obj, CommentForm)

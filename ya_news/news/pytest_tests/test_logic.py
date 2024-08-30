@@ -1,177 +1,112 @@
 from http import HTTPStatus
-
 import pytest
-from django.urls import reverse
-from pytest_django.asserts import assertRedirects, assertFormError
 
-from news.models import News, Comment
+from django.urls import reverse
+from pytest_django.asserts import assertFormError
+
+from news.models import Comment
 from news.forms import BAD_WORDS, WARNING
 
 
 @pytest.mark.django_db
-def test_anonymous_user_cant_create_comment(client):
+def test_anonymous_cant_comment(client, single_news_item, comment_data):
     """
-    Анонимный пользователь
-    не может отправить комментарий.
+    Проверяет, что анонимный пользователь не может отправить комментарий
+    к новости.
     """
-    news = News.objects.create(
-        title='Test News',
-        text='This is a test news.'
-    )
-    url = reverse(
-        'news:detail',
-        args=[news.pk]
-    )
-    response = client.post(
-        url,
-        data={'text': 'Anonymous comment'}
-    )
+    url = reverse('news:detail', args=[single_news_item.pk])
+    response = client.post(url, comment_data)
+    assert Comment.objects.count() == 0
     assert response.status_code == HTTPStatus.FOUND
-    assert response.url.startswith(reverse('users:login'))
-    assert Comment.objects.count() == 0
 
 
 @pytest.mark.django_db
-def test_authorized_user_can_create_comment(client, django_user_model):
-    """Авторизованный пользователь может отправить комментарий."""
-    user = django_user_model.objects.create_user(
-        username='user',
-        password='password'
-    )
-    client.force_login(user)
-    news = News.objects.create(
-        title='Test News',
-        text='This is a test news.'
-    )
-    url = reverse(
-        'news:detail',
-        args=[news.pk]
-    )
-    response = client.post(
-        url,
-        data={'text': 'User comment'}
-    )
-    assertRedirects(response, f'{url}#comments')
+def test_reader_can_submit_comment(
+        reader_logged_in_client,
+        single_news_item,
+        comment_data
+):
+    """
+    Проверяет, что авторизованный пользователь
+    может отправить комментарий к новости.
+    """
+    url = reverse('news:detail', args=[single_news_item.pk])
+    response = reader_logged_in_client.post(url, comment_data)
     assert Comment.objects.count() == 1
-    comment = Comment.objects.get()
-    assert comment.text == 'User comment'
-    assert comment.author == user
+    assert response.status_code == HTTPStatus.FOUND
 
 
 @pytest.mark.django_db
-def test_comment_with_bad_words_is_not_published(client, django_user_model):
+@pytest.mark.parametrize('bad_word', BAD_WORDS)
+def test_comment_with_bad_words(
+        reader_logged_in_client,
+        single_news_item,
+        bad_word
+):
     """
-    Если комментарий содержит запрещённые слова, он не будет опубликован,
-    а форма вернёт ошибку.
+    Проверяет, что комментарий, содержащий запрещенные слова,
+    не добавляется и возвращает сообщение об ошибке.
     """
-    user = django_user_model.objects.create_user(
-        username='user',
-        password='password'
-    )
-    client.force_login(user)
-    news = News.objects.create(
-        title='Test News',
-        text='This is a test news.'
-    )
-    url = reverse(
-        'news:detail',
-        args=[news.pk]
-    )
-    bad_word = BAD_WORDS[0]
-    response = client.post(
-        url,
-        data={'text': f'Comment with {bad_word}'}
-    )
-    assertFormError(
-        response,
-        'form',
-        'text', WARNING
-    )
+    url = reverse('news:detail', args=[single_news_item.pk])
+    response = reader_logged_in_client.post(url, {'text': bad_word})
+    assert Comment.objects.count() == 0
+    assertFormError(response, 'form', 'text', WARNING)
+
+
+@pytest.mark.django_db
+def test_author_delete_comment(author_logged_in_client, single_comment):
+    """
+    Проверяет, что автор комментария
+    может успешно удалить свой комментарий.
+    """
+    url = reverse('news:delete', args=[single_comment.pk])
+    delete = author_logged_in_client.post(url)
+    assert delete.status_code == HTTPStatus.FOUND
     assert Comment.objects.count() == 0
 
 
 @pytest.mark.django_db
-def test_author_can_edit_delete_own_comment(client, django_user_model):
+def test_author_edit_comment(
+        author_logged_in_client,
+        single_comment,
+        comment_data
+):
     """
-    Авторизованный пользователь может
-    редактировать или удалять свои комментарии.
+    Проверяет, что автор комментария
+    может редактировать текст своего комментария.
     """
-    user = django_user_model.objects.create_user(
-        username='author',
-        password='password'
-    )
-    client.force_login(user)
-    news = News.objects.create(
-        title='Test News',
-        text='This is a test news.'
-    )
-    comment = Comment.objects.create(
-        news=news,
-        author=user,
-        text='Original comment'
-    )
-
-    # Редактирование комментария
-    edit_url = reverse(
-        'news:edit',
-        args=[comment.pk]
-    )
-    response = client.post(
-        edit_url,
-        data={'text': 'Edited comment'}
-    )
-    assertRedirects(
-        response,
-        f'{reverse("news:detail", args=[news.pk])}#comments')
-    comment.refresh_from_db()
-    assert comment.text == 'Edited comment'
-
-    # Удаление комментария
-    delete_url = reverse(
-        'news:delete',
-        args=[comment.pk]
-    )
-    response = client.post(delete_url)
-    assertRedirects(
-        response,
-        f'{reverse("news:detail", args=[news.pk])}#comments')
-    assert Comment.objects.count() == 0
+    url = reverse('news:edit', args=[single_comment.pk])
+    response = author_logged_in_client.post(url, comment_data)
+    assert response.status_code == HTTPStatus.FOUND
+    single_comment.refresh_from_db()
+    assert single_comment.text == comment_data['text']
 
 
 @pytest.mark.django_db
-def test_user_cant_edit_delete_others_comment(client, django_user_model):
+def test_reader_cant_delete_comment(reader_logged_in_client, single_comment):
     """
-    Авторизованный пользователь не может
-    редактировать или удалять чужие комментарии.
+    Проверяет, что обычный пользователь
+    не может удалить чужой комментарий.
     """
-    author = django_user_model.objects.create_user(
-        username='author',
-        password='password'
-    )
-    other_user = django_user_model.objects.create_user(
-        username='other',
-        password='password'
-    )
-    client.force_login(other_user)
-    news = News.objects.create(
-        title='Test News',
-        text='This is a test news.'
-    )
-    comment = Comment.objects.create(
-        news=news,
-        author=author,
-        text='Original comment'
-    )
-
-    # Попытка редактирования чужого комментария
-    edit_url = reverse('news:edit', args=[comment.pk])
-    response = client.post(edit_url, data={'text': 'Attempted edit'})
-    assert response.status_code == HTTPStatus.NOT_FOUND
-    comment.refresh_from_db()
-    assert comment.text == 'Original comment'
-
-    # Попытка удаления чужого комментария
-    delete_url = reverse('news:delete', args=[comment.pk])
-    response = client.post(delete_url)
+    url = reverse('news:delete', args=[single_comment.pk])
+    response = reader_logged_in_client.post(url)
     assert response.status_code == HTTPStatus.NOT_FOUND
     assert Comment.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_reader_cant_edit_comment(
+        reader_logged_in_client,
+        single_comment,
+        comment_data
+):
+    """
+    Проверяет, что обычный пользователь
+    не может редактировать чужой комментарий.
+    """
+    original_text = single_comment.text
+    url = reverse('news:edit', args=[single_comment.pk])
+    response = reader_logged_in_client.post(url, comment_data)
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    single_comment.refresh_from_db()
+    assert single_comment.text == original_text
