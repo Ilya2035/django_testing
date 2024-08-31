@@ -1,12 +1,31 @@
 from http import HTTPStatus
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 
-from notes.tests.fixtures import TestDataRoutes
+from notes.models import Note
 
 User = get_user_model()
+
+
+class TestDataRoutes(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        """Создает тестовых пользователей и заметку для проверки маршрутов."""
+        cls.note_author = User.objects.create(username='note_author')
+        cls.other_user = User.objects.create(username='other_user')
+        cls.author_client = Client()
+        cls.other_user_client = Client()
+        cls.author_client.force_login(cls.note_author)
+        cls.other_user_client.force_login(cls.other_user)
+        cls.note = Note.objects.create(
+            title='Sample Title',
+            text='Sample Text',
+            slug='sample-slug',
+            author=cls.note_author
+        )
+        cls.note_args = (cls.note.slug,)
 
 
 class TestRoutes(TestDataRoutes, TestCase):
@@ -24,8 +43,7 @@ class TestRoutes(TestDataRoutes, TestCase):
         )
         for name in urls:
             with self.subTest(name=name):
-                url = reverse(name)
-                response = self.client.get(url)
+                response = self.client.get(reverse(name))
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_page_availability_for_authenticated_user(self):
@@ -40,8 +58,7 @@ class TestRoutes(TestDataRoutes, TestCase):
         )
         for name in urls:
             with self.subTest(name=name):
-                url = reverse(name)
-                response = self.author_client.get(url)
+                response = self.author_client.get(reverse(name))
                 self.assertEqual(response.status_code, HTTPStatus.OK)
 
     def test_edit_delete_detail_access_based_on_user_role(self):
@@ -59,8 +76,7 @@ class TestRoutes(TestDataRoutes, TestCase):
         for client, status in users_statuses:
             for name in ('notes:edit', 'notes:delete', 'notes:detail'):
                 with self.subTest(client=client, name=name):
-                    url = reverse(name, args=(self.note.slug,))
-                    response = client.get(url)
+                    response = client.get(reverse(name, args=self.note_args))
                     self.assertEqual(response.status_code, status)
 
     def test_redirect_for_anonymous_user_to_login(self):
@@ -69,18 +85,17 @@ class TestRoutes(TestDataRoutes, TestCase):
         перенаправляется на страницу логина
         при попытке доступа к защищенным страницам.
         """
-        login_url = reverse('users:login')
         urls = (
-            ('notes:edit', (self.note.slug,)),
-            ('notes:detail', (self.note.slug,)),
-            ('notes:delete', (self.note.slug,)),
+            ('notes:edit', self.note_args),
+            ('notes:detail', self.note_args),
+            ('notes:delete', self.note_args),
             ('notes:list', None),
             ('notes:add', None),
             ('notes:success', None),
         )
         for name, args in urls:
             with self.subTest(name=name):
-                url = reverse(name, args=args)
-                redirect_url = f'{login_url}?next={url}'
-                response = self.client.get(url)
-                self.assertRedirects(response, redirect_url)
+                self.assertRedirects(
+                    self.client.get(reverse(name, args=args)),
+                    f"{reverse('users:login')}?next={reverse(name, args=args)}"
+                )

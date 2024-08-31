@@ -1,10 +1,31 @@
 from http import HTTPStatus
 
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
+from django.contrib.auth import get_user_model
 
 from notes.forms import NoteForm
-from notes.tests.fixtures import TestDataContent
+from notes.models import Note
+
+User = get_user_model()
+
+
+class TestDataContent(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        """Создание тестовых данных для проверки видимости заметок."""
+        cls.note_author = User.objects.create(username='note_author')
+        cls.other_user = User.objects.create(username='other_user')
+        cls.author_client = Client()
+        cls.other_user_client = Client()
+        cls.author_client.force_login(cls.note_author)
+        cls.other_user_client.force_login(cls.other_user)
+        cls.note = Note.objects.create(
+            title='Sample Title',
+            text='Sample Text',
+            slug='sample-slug',
+            author=cls.note_author
+        )
 
 
 class TestContent(TestDataContent, TestCase):

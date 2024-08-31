@@ -2,11 +2,10 @@ from datetime import datetime
 
 import pytest
 from django.test.client import Client
+from django.urls import reverse
+from django.conf import settings
 
 from news.models import News, Comment
-
-
-MAX_NEWS_ITEMS = 10  # Предельное количество новостей для тестирования
 
 
 @pytest.fixture
@@ -71,7 +70,8 @@ def multiple_news_items():
     Создает 10 объектов новостей для тестирования функциональности,
     связанной с отображением и сортировкой новостей.
     """
-    for i in range(MAX_NEWS_ITEMS):
+    news_count = settings.NEWS_COUNT_ON_HOME_PAGE + 5
+    for i in range(news_count):
         News.objects.create(
             title=f'Sample News {i}',
             text=f'Sample news content {i}',
@@ -99,7 +99,7 @@ def multiple_comments(news_author, single_news_item):
     написанных пользователем 'news_author',
     для проверки отображения и сортировки.
     """
-    for i in range(MAX_NEWS_ITEMS):
+    for i in range(settings.NEWS_COUNT_ON_HOME_PAGE):
         Comment.objects.create(
             news=single_news_item,
             author=news_author,
@@ -132,3 +132,56 @@ def comment_data():
     использованы в тестах для проверки создания и валидации комментариев.
     """
     return {'text': 'This is a sample comment'}
+
+
+@pytest.fixture
+def home_url():
+    """Возвращает URL главной страницы."""
+    return reverse('news:home')
+
+
+@pytest.fixture
+def news_detail_url(news_item_id):
+    """Возвращает URL страницы детали конкретной новости по `news_item_id`."""
+    return reverse('news:detail', args=news_item_id)
+
+
+@pytest.fixture
+def news_detail_url_with_comment(single_comment):
+    """
+    Возвращает URL страницы детали новости,
+    связанной с определённым комментарием.
+    """
+    return reverse('news:detail', args=[single_comment.news.pk])
+
+
+@pytest.fixture
+def single_news_detail_url(single_news_item):
+    """
+    Возвращает URL страницы детали
+    конкретной новости по `single_news_item.pk`.
+    """
+    return reverse('news:detail', args=[single_news_item.pk])
+
+
+@pytest.fixture
+def delete_comment_url(single_comment):
+    """Возвращает URL страницы удаления конкретного комментария."""
+    return reverse('news:delete', args=[single_comment.pk])
+
+
+@pytest.fixture
+def edit_comment_url(single_comment):
+    """Возвращает URL страницы редактирования конкретного комментария."""
+    return reverse('news:edit', args=[single_comment.pk])
+
+
+@pytest.fixture
+def url_generator():
+    """
+    Фикстура для генерации URL на основе имени маршрута и аргументов.
+    Использование: url = url_generator('news:edit', [comment_id])
+    """
+    def _generate_url(name, args=None):
+        return reverse(name, args=args)
+    return _generate_url
