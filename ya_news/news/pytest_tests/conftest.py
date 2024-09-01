@@ -174,14 +174,3 @@ def delete_comment_url(single_comment):
 def edit_comment_url(single_comment):
     """Возвращает URL страницы редактирования конкретного комментария."""
     return reverse('news:edit', args=[single_comment.pk])
-
-
-@pytest.fixture
-def url_generator():
-    """
-    Фикстура для генерации URL на основе имени маршрута и аргументов.
-    Использование: url = url_generator('news:edit', [comment_id])
-    """
-    def _generate_url(name, args=None):
-        return reverse(name, args=args)
-    return _generate_url

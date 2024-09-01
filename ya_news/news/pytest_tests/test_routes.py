@@ -3,6 +3,7 @@ from http import HTTPStatus
 import pytest
 from pytest_lazyfixture import lazy_fixture
 from pytest_django.asserts import assertRedirects
+from django.urls import reverse
 
 
 @pytest.mark.django_db
@@ -18,7 +19,6 @@ from pytest_django.asserts import assertRedirects
 )
 def test_page_availability_for_anonymous_user(
     client,
-    url_generator,
     name,
     args
 ):
@@ -26,7 +26,8 @@ def test_page_availability_for_anonymous_user(
     Проверяет, что страницы (главная, логин, логаут, регистрация) доступны
     для анонимного пользователя.
     """
-    response = client.get(url_generator(name, args=args))
+    url = reverse(name, args=args)
+    response = client.get(url)
     assert response.status_code == HTTPStatus.OK
 
 
@@ -43,12 +44,10 @@ def test_page_availability_for_anonymous_user(
     (
         (lazy_fixture('author_logged_in_client'), HTTPStatus.OK),
         (lazy_fixture('reader_logged_in_client'), HTTPStatus.NOT_FOUND),
-        (lazy_fixture('client'), HTTPStatus.FOUND),
     )
 )
 def test_comment_edit_delete_access(
     client_fixture,
-    url_generator,
     name,
     args,
     expected_status
@@ -56,17 +55,18 @@ def test_comment_edit_delete_access(
     """
     Проверяет доступность страниц редактирования
     и удаления комментария для разных пользователей:
-    автор, обычный пользователь, анонимный пользователь.
+    автор и обычный пользователь.
     """
-    response = client_fixture.get(url_generator(name, args=args))
+    url = reverse(name, args=args)
+    response = client_fixture.get(url)
     assert response.status_code == expected_status
 
-    # Дополнительная проверка редиректа для анонимного пользователя
     if expected_status == HTTPStatus.FOUND:
-        login_url = url_generator('users:login')
+        login_url = reverse('users:login')
         assert response.url.startswith(login_url)
 
 
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     'name, args',
     (
@@ -74,15 +74,18 @@ def test_comment_edit_delete_access(
         ('news:delete', lazy_fixture('comment_id')),
     )
 )
-def test_anonymous_user_redirect_to_login(client, url_generator, name, args):
+def test_anonymous_user_redirect_to_login(client, name, args):
     """
     Проверяет, что анонимный пользователь перенаправляется
     на страницу логина при попытке доступа к страницам
     редактирования и удаления комментария.
     """
-    expected_url = (
-        f"{url_generator('users:login')}?next={url_generator(name, args=args)}"
-    )
-    # так делать можно?
-    response = client.get(url_generator(name, args=args))
+    login_url = reverse('users:login')
+    target_url = reverse(name, args=args)
+    expected_url = f'{login_url}?next={target_url}'
+    # создание фикстуры помогает при расширении программы
+    # сделает код более чистым, но вы сказали так не делать
+    # в test_routes, почему?
+
+    response = client.get(target_url)
     assertRedirects(response, expected_url)

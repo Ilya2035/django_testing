@@ -9,7 +9,7 @@ from notes.models import Note
 User = get_user_model()
 
 
-class TestDataRoutes(TestCase):
+class TestRoutes(TestCase):
     @classmethod
     def setUpTestData(cls):
         """Создает тестовых пользователей и заметку для проверки маршрутов."""
@@ -26,9 +26,6 @@ class TestDataRoutes(TestCase):
             author=cls.note_author
         )
         cls.note_args = (cls.note.slug,)
-
-
-class TestRoutes(TestDataRoutes, TestCase):
 
     def test_page_availability_for_anonymous_user(self):
         """
@@ -93,9 +90,11 @@ class TestRoutes(TestDataRoutes, TestCase):
             ('notes:add', None),
             ('notes:success', None),
         )
+
+        login_url = reverse('users:login')
         for name, args in urls:
             with self.subTest(name=name):
-                self.assertRedirects(
-                    self.client.get(reverse(name, args=args)),
-                    f"{reverse('users:login')}?next={reverse(name, args=args)}"
-                )
+                target_url = reverse(name, args=args)
+                response = self.client.get(target_url)
+                expected_redirect_url = f'{login_url}?next={target_url}'
+                self.assertRedirects(response, expected_redirect_url)

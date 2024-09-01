@@ -10,7 +10,7 @@ from notes.models import Note
 User = get_user_model()
 
 
-class TestDataContent(TestCase):
+class TestContent(TestCase):
     @classmethod
     def setUpTestData(cls):
         """Создание тестовых данных для проверки видимости заметок."""
@@ -27,9 +27,6 @@ class TestDataContent(TestCase):
             author=cls.note_author
         )
 
-
-class TestContent(TestDataContent, TestCase):
-
     def test_note_visibility_in_list(self):
         """
         Проверяет видимость заметки в списке заметок для разных пользователей.
@@ -41,8 +38,10 @@ class TestContent(TestDataContent, TestCase):
         ]
 
         for client, expected_in_list in test_cases:
-            with self.subTest(client=client,
-                              expected_in_list=expected_in_list):
+            with self.subTest(
+                    client=client,
+                    expected_in_list=expected_in_list
+            ):
                 url = reverse('notes:list')
                 response = client.get(url)
                 self.assertEqual(response.status_code, HTTPStatus.OK)

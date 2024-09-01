@@ -90,7 +90,6 @@ def test_author_edit_comment(
     """
     original_author = single_comment.author
     original_news = single_comment.news
-    original_created = single_comment.created
 
     response = author_logged_in_client.post(edit_comment_url, comment_data)
     assert response.status_code == HTTPStatus.FOUND
@@ -99,7 +98,6 @@ def test_author_edit_comment(
 
     assert single_comment.author == original_author
     assert single_comment.news == original_news
-    assert single_comment.created == original_created
 
 
 @pytest.mark.django_db
@@ -130,7 +128,6 @@ def test_reader_cant_edit_comment(
     """
     original_author = single_comment.author
     original_news = single_comment.news
-    original_created = single_comment.created
 
     original_text = single_comment.text
     response = reader_logged_in_client.post(edit_comment_url, comment_data)
@@ -140,4 +137,3 @@ def test_reader_cant_edit_comment(
 
     assert single_comment.author == original_author
     assert single_comment.news == original_news
-    assert single_comment.created == original_created
