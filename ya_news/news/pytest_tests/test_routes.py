@@ -83,9 +83,6 @@ def test_anonymous_user_redirect_to_login(client, name, args):
     login_url = reverse('users:login')
     target_url = reverse(name, args=args)
     expected_url = f'{login_url}?next={target_url}'
-    # создание фикстуры помогает при расширении программы
-    # сделает код более чистым, но вы сказали так не делать
-    # в test_routes, почему?
 
     response = client.get(target_url)
     assertRedirects(response, expected_url)
